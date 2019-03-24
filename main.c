@@ -11,7 +11,7 @@
 #include <sys/time.h>       // for select()
 #include <sys/types.h>      // for select()
 
-#define PORT 5000
+#define PORT    5000
 #define MAXBUFF 1000
 
 void erro(char *msg){
@@ -58,70 +58,74 @@ int startSocket(void){
 
 
 int main(void){
-    char recvbuff[MAXBUFF];
-    char sendbuff[MAXBUFF];
-    memset(recvbuff, 0, MAXBUFF);
-    memset(sendbuff, 0, MAXBUFF);
-    int fSockSv;    
-
+    char recvbuff[MAXBUFF] = {0};
+    char sendbuff[MAXBUFF] = {0};
+    int fSockSv;
+    fd_set activeFdSet;                /* estrutura fd_set recebe descriptors ativos*/
+    fd_set readFdSet;                  /* estrutura fd_set recebe descriptors para monitorar */
 
     if((fSockSv = startSocket()) < 0){
         erro("socket"); 
     }
 
+    /* inicializa fd_set */
+    FD_ZERO(&activeFdSet);
+    FD_SET(fileno(stdin), &activeFdSet);
+
     puts("Escutando...");
 
     while(true){
-    
-        int tamMsg = NULL;          /* tamanho da msg enviado pelo cliente */
-        int fSockCl = NULL;         /* file descriptor socket cliente */
-        int maxFd = NULL;           /* valor do maior file decriptor*/
+
+        int tamMsg  = 0;            /* tamanho da msg enviada pelo cliente */
+        int fSockCl = 0;            /* file descriptor socket cliente */
+        int maxFd   = 0;            /* valor do maior file decriptor */
         struct sockaddr_in dadosCl; /* recebe os dados do cliente, por accept() */
         socklen_t tDadosCl = sizeof(dadosCl);
 
         /* accpet aguardando por conexões */
         if ((fSockCl = accept(fSockSv, 
-                  (struct sockaddr *)&dadosCl, &tDadosCl)) < 0){
+                              (struct sockaddr *) &dadosCl,
+                              &tDadosCl)) < 0){
             erro("accpet");
         }
 
-        maxFd = (fSockSv > maxFd) ? fSockSv : maxFd;
+        maxFd = (fSockCl > maxFd) ? fSockCl : maxFd;
 
-        printf("Conectado: %s:%hd\n\n", 
-            inet_ntoa(dadosCl.sin_addr),
-            ntohs(dadosCl.sin_port));
+        /* inseri socket cliente 'fSockCl' no fd_set */
+        FD_SET(fSockCl, &activeFdSet); 
+
+        printf("Conectado: %s:%d\n\n", 
+                inet_ntoa(dadosCl.sin_addr),
+                ntohs(dadosCl.sin_port));
 
         while(true){
-            /* estrutura fd_set */
-            fd_set rfds;
-                
-            /* zera a estrutura 'rfds' e adicona a
-            entrada padrão e o socket cliente na estrutura */
-            FD_ZERO(&rfds);
-            FD_SET(0, &rfds);
-            FD_SET(fSockCl, &rfds);
+
+            readFdSet = activeFdSet;
 
             /* aguardando algum file descriptor
              disponivel para leitura */
-            if(select(maxFd + 1, &rfds, NULL, NULL, NULL) < 0){
-                perror("select: ");
+            if(select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0){
+                perror("select");
                 exit(EXIT_FAILURE);
             }
-            if(FD_ISSET(fSockCl, &rfds)){
-                if (tamMsg = recv(fSockCl, recvbuff, MAXBUFF, 0) > 0){
-                    recvbuff[tamMsg] = '\0';
+
+            if(FD_ISSET(fSockCl, &readFdSet)){
+                memset(recvbuff, 0, MAXBUFF);
+                if ((tamMsg = recv(fSockCl, recvbuff, MAXBUFF, 0)) > 0){
+                    recvbuff[tamMsg] = '\0'; /* inserir caracter NUL no fim da msg */
                     printf("%s", recvbuff);
-                    fflush(stdout); /* força descarga dos dados caso printf não encontre '\n' */
-                    memset(recvbuff, 0, MAXBUFF);
+                    fflush(stdout);         /* força descarga dos dados mesmo que não encontre '\n' */   
                 }
                 else {
                     close(fSockCl);
-                    puts("Cliente desconectou!");
+                    FD_CLR(fSockCl, &activeFdSet);
+                    puts("\nCliente desconectou!");
                     break;
                 }
             }            
-            else if(FD_ISSET(0, &rfds)){
-                read(stdin, sendbuff, MAXBUFF);
+            else if(FD_ISSET(fileno(stdin), &readFdSet)){
+                memset(sendbuff, 0, MAXBUFF);
+                read(fileno(stdin), sendbuff, MAXBUFF);
                 if((send(fSockCl, sendbuff, strlen(sendbuff), 0)) < 0){
                     erro("send");
                 }
