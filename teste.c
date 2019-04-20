@@ -9,7 +9,9 @@
 
 #define  MAXBUFF 10240
 
+char header[4] = {0x43, 0x4c, 0x01};
 char buff[MAXBUFF];
+char buff2[MAXBUFF] = {0};
 
 int startSocket(void);
 void erro(char *);
@@ -21,6 +23,7 @@ int main(void){
     fSock = startSocket();
     fd_set activeFdSet, readFdSet;
     int maxFd = 0;
+    int bytesread = 0;
 
 
     maxFd = (fSock > maxFd) ? fSock : maxFd;
@@ -29,8 +32,7 @@ int main(void){
     FD_SET(fileno(stdin), &activeFdSet);
     FD_SET(maxFd, &activeFdSet);
 
-
-    send(fSock, "CL", 2, 0);
+    //send(fSock, header, 4, 0);
     while(1)
     {
         readFdSet = activeFdSet;
@@ -39,14 +41,20 @@ int main(void){
           erro("select");
 
         if(FD_ISSET(fSock, &readFdSet)){
-          recv(fSock, buff, MAXBUFF, 0);
-          printf("%s\n", buff);
-          memset(buff, 0x0, MAXBUFF);
+          bytesread = recv(fSock, buff, MAXBUFF, 0);
+          buff[bytesread] = '\0';
+          printf("%s", buff);
+          fflush(stdout);
         }
         else if(FD_ISSET(fileno(stdin), &readFdSet)){
-          read(fileno(stdin), buff, 100);
-          send(fSock, buff, strlen(buff), 0);
-          memset(buff, 0x0, MAXBUFF);
+          bytesread = read(fileno(stdin), buff, MAXBUFF);
+
+          header[3] = bytesread;
+          memcpy(buff2, header, sizeof(header));
+          memcpy(buff2 + sizeof(header), buff, bytesread);
+          buff2[bytesread + sizeof(header)] = '\0';
+
+          send(fSock, buff2, bytesread + sizeof(header) + 1, 0);
         }
 
     }

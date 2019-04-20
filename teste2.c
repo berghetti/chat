@@ -4,12 +4,15 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <arpa/inet.h>	    // for inet_ntoa
+#include <arpa/inet.h>	// for inet_ntoa
 #include <unistd.h>	    // for close()
 
 #define  MAXBUFF 10240
 
-char buff[MAXBUFF];
+
+char header[4] = {'A', 'D', 0x01};
+char buff[MAXBUFF] = {0};
+char buff2[MAXBUFF] = {0};
 
 int startSocket(void);
 void erro(char *);
@@ -23,7 +26,6 @@ int main(void){
     int maxFd = 0;
     int bytesread = 0;
 
-
     maxFd = (fSock > maxFd) ? fSock : maxFd;
 
     FD_ZERO(&activeFdSet);
@@ -31,7 +33,8 @@ int main(void){
     FD_SET(maxFd, &activeFdSet);
 
 
-    send(fSock, "AD", 2, 0);
+
+    send(fSock, header, 4, 0);
     while(1)
     {
         readFdSet = activeFdSet;
@@ -46,8 +49,17 @@ int main(void){
             fflush(stdout);
         }
         else if(FD_ISSET(fileno(stdin), &readFdSet)){
-          bytesread = read(fileno(stdin), buff, 100);
-          send(fSock, buff, bytesread, 0);
+          bytesread = read(fileno(stdin), buff, MAXBUFF);
+          //printf("%d\n", bytesread);
+
+          header[3] = bytesread;
+
+          //printf("%d\n", header[3]);
+          memcpy(buff2, header, sizeof(header));
+          memcpy(buff2 + sizeof(header), buff, bytesread);
+          buff2[bytesread + sizeof(header)] = '\0';
+
+          send(fSock, buff2, bytesread + sizeof(header) + 1, 0);
         }
 
     }
