@@ -6,8 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <sys/time.h>   // for select()
-#include <sys/types.h>  // for select()
+
 
 
 #define PORT    5000				// porta de escuta
@@ -17,7 +16,8 @@
 // códigos de erro
 enum COD_ERRO{
   FAILSEND = 1, // falha ao enviar mensagem
-  WAITPAIR      // aguardar par da conexão para encaminhar mensagem
+  WAITPAIR,     // aguardar par da conexão para encaminhar mensagem
+  DISCONECTED   // cliente desconectado
 };
 // var global
 int fSockSv;

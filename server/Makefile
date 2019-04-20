@@ -1,5 +1,5 @@
 
-FLAGS 	= -Wall -pedantic
+FLAGS 	= -Wall -Werror -O2 -pedantic
 
 SRC 		= ./src
 BIN 		= ./bin

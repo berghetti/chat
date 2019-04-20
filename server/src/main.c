@@ -1,10 +1,17 @@
 // main.c
 
 #include <locale.h>     // for setlocale()
-#include <unistd.h>			// for close()
+#include <unistd.h>			// for close, select
+#include <sys/time.h>   // for select()
+#include <sys/types.h>  // for select()
 
 #include <server.h>
 
+// armazana clientes e administradores conectados
+PACKET *clientes;
+PACKET *admins;
+
+void clearCon(int sock);
 
 int main(void)
 {
@@ -12,11 +19,10 @@ int main(void)
 
 	// cria vetor com tamanho MAXCLIENT
 	// acessa cada espaço com clientes[i].campo
-	PACKET *clientes = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
-	PACKET *admins = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
+	clientes = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
+	admins = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
 
-
-	int i, j;
+	int i;
 	int status;
 	int maxFd;						/* valor do maior file descriptor */
 	fd_set activeFdSet;   /* estrutura que recebe descritores ativos */
@@ -34,57 +40,64 @@ int main(void)
 
 	while(true)
 	{
-				readFdSet = activeFdSet;
+		readFdSet = activeFdSet;
 
-				if(select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0)
-						erro("select");
+		if(select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0)
+				erro("select");
 
-				for(i = 0; i <= maxFd; i++)
+		for(i = 0; i <= maxFd; i++)
+		{
+			if(FD_ISSET(i, &readFdSet))
+			{
+				/* caso seja uma nova conexão
+				   verifica se é uma conexão validar
+				   e aloca no vetor adequado, clientes ou admins */
+				if(i == fSockSv)
 				{
-					if(FD_ISSET(i, &readFdSet))
+					validar(&activeFdSet, &maxFd, admins, clientes);
+				}
+				else
+				{
+					puts("Recebendo dados...");
+					status = forwardMsg(i, admins, clientes);
+					switch (status)
 					{
-						/* caso seja uma nova conexão
-						   verifica se é uma conexão validar
-						   e aloca no vetor adequado, clientes ou admins */
-						if(i == fSockSv)
-						{
-							validar(&activeFdSet, &maxFd, admins, clientes);
-						}
-						else
-						{
-							puts("Recebendo dados...");
-							status = forwardMsg(i, admins, clientes);
-							if (status == WAITPAIR){
-								continue;
-								puts("aqui2");
-							}
-							else if (status == FAILSEND)
-							{
-								puts("Não localizado par com mesmo ID");
-								FD_CLR(i, &activeFdSet);
-								close(i);
-								for(j = 0; j < MAXCLIENT; j++)
-								{
-									if(clientes[j].sock == i){
-										clientes[j].id = 0;
-										printf("Conexão cliente %s:%d desconectou!\n",
-										 			clientes[j].adress, clientes[j].port);
-										break;
-									}
-									else if (admins[j].sock == i)
-									{
-										admins[j].id = 0;
-										printf("Conexão admin %s:%d desconectou!\n",
-										 				admins[j].adress, admins[j].port);
-										break;
-									}
-								}	// for j
-							}
-						}
-					}
-				} // for i
+					case WAITPAIR:
+						puts("Não localizado par com mesmo ID");
+						continue;
 
-	}
+					case FAILSEND:
+					case DISCONECTED:
+						FD_CLR(i, &activeFdSet);
+						clearCon(i);
+						close(i);
+						break;
+					} // switch
+				}
+			} //if FD_ISSET
+		} // for i
+	} // while true
 
 	return 0;
+}
+
+void clearCon(int sock)
+{
+	int j;
+	for(j = 0; j < MAXCLIENT; j++)
+	{
+		if(clientes[j].sock == sock){
+			clientes[j].id = 0;
+			printf("Conexão cliente %s:%d desconectou!\n",
+						clientes[j].adress, clientes[j].port);
+			break;
+		}
+		else if (admins[j].sock == sock)
+		{
+			admins[j].id = 0;
+			printf("Conexão admin %s:%d desconectou!\n",
+							admins[j].adress, admins[j].port);
+			break;
+		}
+	}
 }

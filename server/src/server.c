@@ -6,7 +6,7 @@
 #include <sys/socket.h>     // for socket()
 #include <netinet/in.h>     // for socket()
 #include <arpa/inet.h>      // for inet_ntoa()
-#include <unistd.h>         // for close()
+#include <unistd.h>         // for close, select
 
 #include <server.h>
 
@@ -26,8 +26,11 @@ PACKET * receivAll(int sockIn)
 	do
 	{
 		bytesReceived = recv(sockIn, pBuff, MAXBUFF, 0);
-		if(bytesReceived == 0)
+		if(bytesReceived == 0)	// cliente desconectou
+		{
+			free(packet);
 			return NULL;
+		}
 
 		packet->len 	= buff[3];
 		bytesReceived += bytesReceived;
@@ -72,8 +75,11 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 	PACKET *packet = (PACKET *) malloc(sizeof(PACKET));
 
 	packet = receivAll(sock);
-	if(packet == NULL)
-		return false;
+	if(packet == NULL){
+		free(packet);
+		return DISCONECTED;
+	}
+
 
 	if(!strcmp(packet->type, "CL"))
 	{
@@ -106,6 +112,11 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
       }
 		} // não foi encontrado par com mesmo ID
     if (!localizado) return WAITPAIR;
+	}
+	else
+	{
+		close(sock);
+		free(packet);
 	}
 
 	return 0;
