@@ -8,7 +8,6 @@
 #include <stdbool.h>
 
 
-
 #define PORT    5000				// porta de escuta
 #define MAXBUFF 10240
 #define MAXCLIENT 10        // maximo de cliente que o servidor vai tratar

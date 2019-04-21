@@ -11,6 +11,7 @@
 PACKET *clientes;
 PACKET *admins;
 
+// zera o ID da conexão
 void clearCon(int sock);
 
 int main(void)
@@ -31,8 +32,8 @@ int main(void)
 	if((fSockSv = startSocket()) < 0)
 		erro("socket");
 
-	FD_ZERO(&activeFdSet); /* zera fd_set */
-	FD_SET(fSockSv, &activeFdSet);
+	FD_ZERO(&activeFdSet); 				 /* zera fd_set */
+	FD_SET(fSockSv, &activeFdSet); // inclui o socket do servidor
 
 	maxFd = fSockSv;
 
