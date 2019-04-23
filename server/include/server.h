@@ -18,6 +18,7 @@ enum COD_ERRO{
   WAITPAIR,     // aguardar par da conexão para encaminhar mensagem
   DISCONECTED   // cliente desconectado
 };
+
 // var global
 int fSockSv;
 
@@ -46,8 +47,9 @@ int startSocket(void);
 
 /*valida uma nova conexão
   caso a conexão seja valida, adiciona o identificador
-  no vetor apropriado, clientes ou admnis */
-bool validar(fd_set *activeFdSet, int *, PACKET *clientes, PACKET *admins);
+  no vetor apropriado - clientes ou admnis - e retorna o
+  file descriptor da conexão */
+int validar(fd_set *activeFdSet, PACKET *clientes, PACKET *admins);
 
 // função de erro padrão
 void erro(char *);

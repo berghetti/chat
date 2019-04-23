@@ -1,17 +1,18 @@
 // main.c
 
-#include <locale.h>     // for setlocale()
-#include <unistd.h>			// for close, select
-#include <sys/time.h>   // for select()
-#include <sys/types.h>  // for select()
+#include <locale.h>     // setlocale()
+#include <unistd.h>			// close, select
+#include <sys/time.h>   // select()
+#include <sys/types.h>  // select()
+#include <string.h>			// memset()
 
-#include <server.h>
+#include <server.h>			// in ./include
 
 // armazana clientes e administradores conectados
 PACKET *clientes;
 PACKET *admins;
 
-// zera o ID da conexão
+// zera os dados da conexão
 void clearCon(int sock);
 
 int main(void)
@@ -23,8 +24,12 @@ int main(void)
 	clientes = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
 	admins = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
 
+	memset(clientes, 0, sizeof(PACKET));
+	memset(admins, 0, sizeof(PACKET));
+
 	int i;
 	int status;
+	int fd;
 	int maxFd;						/* valor do maior file descriptor */
 	fd_set activeFdSet;   /* estrutura que recebe descritores ativos */
 	fd_set readFdSet;     /* estrutura que é atualizada a cada iteração */
@@ -55,7 +60,8 @@ int main(void)
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
 				{
-					validar(&activeFdSet, &maxFd, admins, clientes);
+					if( (fd = validar(&activeFdSet, admins, clientes)) > 0)
+ 						maxFd = (maxFd > fd) ? maxFd : fd;
 				}
 				else
 				{
@@ -88,16 +94,16 @@ void clearCon(int sock)
 	for(j = 0; j < MAXCLIENT; j++)
 	{
 		if(clientes[j].sock == sock){
-			clientes[j].id = 0;
-			printf("Conexão cliente %s:%d desconectou!\n",
-						clientes[j].adress, clientes[j].port);
+			printf("Conexão cliente desconectou - %s:%d ID - %d!\n",
+						clientes[j].adress, clientes[j].port, clientes[j].id);
+			memset(&clientes[j], 0, sizeof(PACKET));
 			break;
 		}
 		else if (admins[j].sock == sock)
 		{
-			admins[j].id = 0;
-			printf("Conexão admin %s:%d desconectou!\n",
-							admins[j].adress, admins[j].port);
+			printf("Conexão admin desconectou - %s:%d ID - %d\n",
+							admins[j].adress, admins[j].port, admins[j].id);
+			memset(&admins[j], 0, sizeof(PACKET));
 			break;
 		}
 	}

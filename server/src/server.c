@@ -123,12 +123,11 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 }
 
 
-bool validar(fd_set *activeFdSet, int *maxFd,
-              PACKET *admins, PACKET *clientes)
+int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
  {
 	 int i;
-	 int status = 0;
-	 int sockCon = 0;				// file descriptor socket cliente
+	 int status = 0;		// utilizada para verificar se o ID da conexão ja existe
+	 int sockCon = 0;		// file descriptor socket cliente
 	 struct sockaddr_in dadosCl; /* recebe os dados do cliente, por accept() */
 	 socklen_t tDadosCl = sizeof(dadosCl);
 	 PACKET *packet = malloc(sizeof(PACKET));
@@ -151,8 +150,9 @@ bool validar(fd_set *activeFdSet, int *maxFd,
 		 {
 			 if(clientes[i].id == packet->id)
 			 {
-				 puts("Cliente ja esta no sistema");
 				 status = 1;
+				 close(sockCon);
+				 puts("Cliente ja esta no sistema");
 				 break;
 			 }
 		 } // for localizar cliente
@@ -164,17 +164,17 @@ bool validar(fd_set *activeFdSet, int *maxFd,
 				 if(clientes[i].id == 0)
 				 {
 					 clientes[i]        = *packet;
+					 free(packet);
 					 clientes[i].sock   = sockCon;
            clientes[i].adress = packet->adress;
            clientes[i].port   = packet->port;
 					 FD_SET(clientes[i].sock, activeFdSet);
-           printf("cliente %s:%d conectado!\n",
-                 clientes[i].adress, clientes[i].port);
+           printf("Cliente conectado %s:%d ID - %d\n",
+                 clientes[i].adress, clientes[i].port, clientes[i].id);
 					 break;
 				 }
 			 }
 		 }
-			*maxFd = (sockCon > *maxFd) ? sockCon : *maxFd;
 	 }
 
 	 else if(!strcmp(packet->type, "AD"))
@@ -188,7 +188,9 @@ bool validar(fd_set *activeFdSet, int *maxFd,
 			 if(admins[i].id == packet->id)
 			 {
 				 status = 1;
-				 puts("admin ja esta no sistema");
+				 close(sockCon);
+				 free(packet);
+				 printf("ID %d admin duplicado, deconectado ultimna solicitação\n", admins[i].id);
 				 break;
 			 }
 		 }
@@ -200,29 +202,26 @@ bool validar(fd_set *activeFdSet, int *maxFd,
 				 if(admins[i].id == 0)
 				 {
 					 admins[i]        = *packet;
+					 free(packet);
 					 admins[i].sock   = sockCon;
            admins[i].adress = packet->adress;
            admins[i].port   = packet->port;
 					 FD_SET(admins[i].sock, activeFdSet);
-           printf("admin %s:%d conectado!\n",
-                 admins[i].adress, admins[i].port);
+           printf("Admin conectado %s:%d ID - %d\n",
+                 admins[i].adress, admins[i].port, admins[i].id);
 					 break;
 				 }
 			 }
 		 }
-
-			 *maxFd = (sockCon > *maxFd) ? sockCon : *maxFd;
 	 }
 	 else
 	 { // desconecta caso a conexão não possa ser identificada
- 	 	close(sockCon);
-    free(packet);
-		return false;
+ 	 		close(sockCon);
+    	free(packet);
+			return false;
 	 }
-
-
-		return true;
- }
+	 return sockCon;
+ } // validar()
 
 
 int startSocket(void)
