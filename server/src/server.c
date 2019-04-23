@@ -1,12 +1,12 @@
 // server.c
 
-#include <string.h>         // for strcmp()
-#include <errno.h>      		// for perror()
-#include <sys/types.h>      // for socket()
-#include <sys/socket.h>     // for socket()
-#include <netinet/in.h>     // for socket()
-#include <arpa/inet.h>      // for inet_ntoa()
-#include <unistd.h>         // for close, select
+#include <string.h>         // strcmp
+#include <errno.h>      		// perror
+#include <sys/types.h>      // socket
+#include <sys/socket.h>     // socket
+#include <netinet/in.h>     // inet_ntoa
+#include <arpa/inet.h>      // inet_ntoa
+#include <unistd.h>         // close
 
 #include <server.h>
 

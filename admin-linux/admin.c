@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <arpa/inet.h>	// for inet_ntoa
-#include <unistd.h>	    // for close()
+#include <sys/types.h>  // socket
+#include <sys/socket.h> // socket, inet_*
+#include <sys/select.h> // select
+#include <locale.h>     // setlocale
+#include <string.h>     // memcpy
+#include <arpa/inet.h>	// inet_*
+#include <netinet/in.h> // inet_*
+#include <unistd.h>	    // close
 
 #define  MAXBUFF 10240
 
@@ -20,10 +22,11 @@ void erro(char *);
 int fSock;
 
 int main(void){
+    setlocale(LC_ALL, "");
 
     fSock = startSocket();
     fd_set activeFdSet, readFdSet;
-    int maxFd = 0;
+    int maxFd;
     int bytesread = 0;
 
     maxFd = (fSock > maxFd) ? fSock : maxFd;
@@ -37,30 +40,30 @@ int main(void){
     send(fSock, header, 4, 0);
     while(1)
     {
-        readFdSet = activeFdSet;
+      readFdSet = activeFdSet;
 
-        if (select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0)
-          erro("select");
+      if (select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0)
+        erro("select");
 
-        if(FD_ISSET(fSock, &readFdSet)){
-            bytesread = recv(fSock, buff, MAXBUFF, 0);
-            buff[bytesread] = '\0';
-            printf("%s", buff);
-            fflush(stdout);
-        }
-        else if(FD_ISSET(fileno(stdin), &readFdSet)){
-          bytesread = read(fileno(stdin), buff, MAXBUFF);
-          //printf("%d\n", bytesread);
+      if(FD_ISSET(fSock, &readFdSet)){
+          bytesread = recv(fSock, buff, MAXBUFF, 0);
+          buff[bytesread] = '\0';
+          printf("%s", buff);
+          fflush(stdout);
+      }
+      else if(FD_ISSET(fileno(stdin), &readFdSet)){
+        bytesread = read(fileno(stdin), buff, MAXBUFF);
+        //printf("%d\n", bytesread);
 
-          header[3] = bytesread;
+        header[3] = bytesread;
 
-          //printf("%d\n", header[3]);
-          memcpy(buff2, header, sizeof(header));
-          memcpy(buff2 + sizeof(header), buff, bytesread);
-          buff2[bytesread + sizeof(header)] = '\0';
+        //printf("%d\n", header[3]);
+        memcpy(buff2, header, sizeof(header));
+        memcpy(buff2 + sizeof(header), buff, bytesread);
+        buff2[bytesread + sizeof(header)] = '\0';
 
-          send(fSock, buff2, bytesread + sizeof(header) + 1, 0);
-        }
+        send(fSock, buff2, bytesread + sizeof(header) + 1, 0);
+      }
 
     }
 
@@ -81,7 +84,7 @@ int startSocket(void){
   socklen_t tDadosSv= sizeof(dadosSv);
 
   if ((connect(fSock, (struct sockaddr *)&dadosSv, tDadosSv)) < 0)
-      erro("erro ao conectar");
+      erro("connect");
 
   return fSock;
 }

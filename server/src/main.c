@@ -1,10 +1,9 @@
 // main.c
 
-#include <locale.h>     // setlocale()
+#include <locale.h>     // setlocale
 #include <unistd.h>			// close, select
-#include <sys/time.h>   // select()
-#include <sys/types.h>  // select()
-#include <string.h>			// memset()
+#include <sys/select.h>	// select
+#include <string.h>			// memset
 
 #include <server.h>			// in ./include
 
@@ -44,7 +43,7 @@ int main(void)
 
 	puts("Escutando...");
 
-	while(true)
+	while(1)
 	{
 		readFdSet = activeFdSet;
 
