@@ -1,3 +1,9 @@
+/* admin.c
+   cabeçalho
+    2 bytes - tipos
+    4 bytes - id
+    4 bytes - len */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>  // socket
@@ -5,39 +11,58 @@
 #include <sys/select.h> // select
 #include <locale.h>     // setlocale
 #include <string.h>     // memcpy
-#include <arpa/inet.h>	// inet_*
+#include <arpa/inet.h>	// inet_*, htonl
 #include <netinet/in.h> // inet_*
 #include <unistd.h>	    // close
+#include <stdint.h>     // definições de tipos
 
 #define  MAXBUFF 10240
 
+struct header {
+  uint32_t id;
+  uint32_t len;
+  uint16_t type;
+};
 
-char header[4] = {'A', 'D', 0x01};
-char buff[MAXBUFF] = {0};
-char buff2[MAXBUFF] = {0};
+struct packet{
+  struct header *head;
+  uint8_t *data;
+};
+
+uint8_t buff2[MAXBUFF] = {0};
 
 int startSocket(void);
 void erro(char *);
+uint8_t *serialize(struct packet *);
 
 int fSock;
 
 int main(void){
     setlocale(LC_ALL, "");
 
-    fSock = startSocket();
     fd_set activeFdSet, readFdSet;
     int maxFd;
-    int bytesread = 0;
+    ssize_t bytesread;
+    uint8_t *dataSend;
+    struct packet *pacote;
 
+    pacote = (struct packet *) malloc(sizeof(struct packet));
+    pacote->head = (struct header *) malloc(sizeof(struct header));
+
+    pacote->head->type = 0x0A0D;
+    pacote->head->id = 1;
+
+
+    fSock = startSocket();
+
+    maxFd = 0;
     maxFd = (fSock > maxFd) ? fSock : maxFd;
 
     FD_ZERO(&activeFdSet);
     FD_SET(fileno(stdin), &activeFdSet);
     FD_SET(maxFd, &activeFdSet);
 
-
-
-    send(fSock, header, 4, 0);
+    //send(fSock, header, 4, 0);
     while(1)
     {
       readFdSet = activeFdSet;
@@ -46,29 +71,61 @@ int main(void){
         erro("select");
 
       if(FD_ISSET(fSock, &readFdSet)){
-          bytesread = recv(fSock, buff, MAXBUFF, 0);
-          buff[bytesread] = '\0';
-          printf("%s", buff);
+          bytesread = 0;
+          bytesread = recv(fSock, buff2, MAXBUFF, 0);
+          buff2[bytesread] = '\0';
+          printf("%s", buff2);
           fflush(stdout);
       }
       else if(FD_ISSET(fileno(stdin), &readFdSet)){
-        bytesread = read(fileno(stdin), buff, MAXBUFF);
-        //printf("%d\n", bytesread);
+        bytesread = read(fileno(stdin), buff2, MAXBUFF);
+        buff2[bytesread] = '\0';
+        pacote->head->len = (uint32_t) bytesread;
+        pacote->data = (uint8_t *) buff2;
 
-        header[3] = bytesread;
+        dataSend = serialize(pacote);
+        printf("%ld\n", sizeof(pacote->head->type));
+        send(fSock, dataSend, sizeof(struct header) + bytesread, 0);
 
-        //printf("%d\n", header[3]);
-        memcpy(buff2, header, sizeof(header));
-        memcpy(buff2 + sizeof(header), buff, bytesread);
-        buff2[bytesread + sizeof(header)] = '\0';
-
-        send(fSock, buff2, bytesread + sizeof(header) + 1, 0);
       }
 
     }
 
     return 0;
 }
+uint8_t * serialize(struct packet *pacote)
+{
+  uint32_t padding;
+  uint32_t len;
+  uint8_t *buff;
+
+  // tamanho do bufer com base no tamanho da mensagem e no tamanho do cabeçalho
+  buff = (uint8_t *) malloc(sizeof(struct header) + pacote->head->len + 1);
+
+
+  // salva tamanho da mensagem antes de ordenar os bytes para big endian
+  len = pacote->head->len;
+
+  // ordena os bytes para o modo de rede
+  pacote->head->type = htons(pacote->head->type);
+  pacote->head->id   = htonl(pacote->head->id);
+  pacote->head->len  = htonl(pacote->head->len);
+
+  // serializa os dados
+  memcpy(buff, &pacote->head->type, sizeof(pacote->head->type));
+
+  padding = sizeof(pacote->head->type);
+  memcpy(buff + padding, &pacote->head->id, sizeof(pacote->head->id));
+
+  padding += sizeof(pacote->head->id);
+  memcpy(buff + padding, &pacote->head->len, sizeof(pacote->head->len));
+
+  padding += sizeof(pacote->head->len);
+  memcpy(buff + padding, pacote->data, len + 1);  // +1 para incluir o caracter nulo
+
+  return buff;
+}
+
 
 int startSocket(void){
   // file descriptor que identifica o socket local
@@ -81,9 +138,7 @@ int startSocket(void){
   dadosSv.sin_addr.s_addr = inet_addr("192.168.2.105"); // INADDR_ANY = localhost
   memset(&dadosSv.sin_zero, 0, sizeof(dadosSv.sin_zero));
 
-  socklen_t tDadosSv= sizeof(dadosSv);
-
-  if ((connect(fSock, (struct sockaddr *)&dadosSv, tDadosSv)) < 0)
+  if ((connect(fSock, (struct sockaddr *)&dadosSv, sizeof(dadosSv))) < 0)
       erro("connect");
 
   return fSock;

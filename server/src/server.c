@@ -1,5 +1,6 @@
 // server.c
 
+#include <stdbool.h>
 #include <string.h>         // strcmp
 #include <errno.h>      		// perror
 #include <sys/types.h>      // socket
