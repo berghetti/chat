@@ -11,6 +11,7 @@
 PACKET *clientes;
 PACKET *admins;
 
+int fSockSv;
 // zera os dados da conexão
 void clearCon(int sock);
 
@@ -29,6 +30,7 @@ int main(void)
 	int i;
 	int status;
 	int fd;
+
 	int maxFd;						/* valor do maior file descriptor */
 	fd_set activeFdSet;   /* estrutura que recebe descritores ativos */
 	fd_set readFdSet;     /* estrutura que é atualizada a cada iteração */
@@ -58,7 +60,7 @@ int main(void)
 				   verifica se é uma conexão validar
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
-				{
+				{	// retorna o file descriptor da conexão
 					if( (fd = validar(&activeFdSet, admins, clientes)) > 0)
  						maxFd = (maxFd > fd) ? maxFd : fd;
 				}
@@ -94,14 +96,14 @@ void clearCon(int sock)
 	{
 		if(clientes[j].sock == sock){
 			printf("Conexão cliente desconectou - %s:%d ID - %d!\n",
-						clientes[j].adress, clientes[j].port, clientes[j].id);
+						clientes[j].adress, clientes[j].port, clientes[j].head.id);
 			memset(&clientes[j], 0, sizeof(PACKET));
 			break;
 		}
 		else if (admins[j].sock == sock)
 		{
 			printf("Conexão admin desconectou - %s:%d ID - %d\n",
-							admins[j].adress, admins[j].port, admins[j].id);
+							admins[j].adress, admins[j].port, admins[j].head.id);
 			memset(&admins[j], 0, sizeof(PACKET));
 			break;
 		}

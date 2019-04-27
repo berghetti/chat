@@ -5,11 +5,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
 #define PORT    5000				// porta de escuta
 #define MAXBUFF 10240
 #define MAXCLIENT 10        // maximo de cliente que o servidor vai tratar
+
+// extern char *ADMIN;
+// extern char *CLIENTE;
 
 // códigos de erro
 enum COD_ERRO{
@@ -19,21 +23,28 @@ enum COD_ERRO{
 };
 
 // var global
-int fSockSv;
+extern int fSockSv;
 
 typedef struct sockaddr SA;
 
+struct header{
+  uint32_t id;	 // id que identifica o cliente especifico
+  uint32_t len;	 // tamanho do conteudo a ser recebido
+  uint16_t type; // identifica o cliente se é 'CL' ou 'AD'
+};
+
 // estrutura da mensagem que o servidor deve receber
 typedef struct {
-	char *data;			   // dados da mensagem excluido o cabeçaho
-  char *adress;      // endereço do cliente
-  int port;          // porta de conexão do cliente
-	int id;					   // id que identifica o cliente especifico
-	unsigned int len;	 // tamanho do conteudo a ser recebido
-	int sock;				   // socket associado ao cliente
-	char type[2];		   // identifica o cliente se é 'CL' ou 'AD'
+  struct header head; // cabeçaho do pacote
+	char *data;			    // dados da mensagem excluido o cabeçaho
+  char *adress;       // endereço do cliente
+  uint16_t port;      // porta de conexão do cliente
+	int sock;				    // socket associado ao cliente
 } PACKET;
 
+
+
+PACKET * deserialize(uint8_t *buff);
 
 /* faz o ecaminhamento  de mensagens entre cliente e admin
    baseado no id que identifica a conexao, caso

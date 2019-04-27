@@ -1,4 +1,4 @@
-/* admin.c
+/* cliente.c
    cabeçalho
     2 bytes - tipos
     4 bytes - id
@@ -30,7 +30,7 @@ struct packet{
   uint8_t *data;
 };
 
-const char *ADMIN = "AD";     // identificador do pacote
+const char *CLIENTE = "CL";     // identificador do pacote
 uint8_t buff2[MAXBUFF] = {0};
 
 int startSocket(void);
@@ -50,7 +50,7 @@ int main(void){
 
     pacote = (struct packet *) malloc(sizeof(struct packet));
 
-    memcpy(&pacote->head.type, ADMIN, sizeof(pacote->head.type));
+    memcpy(&pacote->head.type, CLIENTE, sizeof(pacote->head.type));
     pacote->head.type = htons(pacote->head.type);
     pacote->head.id = htonl(1);
 
