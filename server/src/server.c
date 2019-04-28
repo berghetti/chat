@@ -56,11 +56,16 @@ PACKET * deserialize(uint8_t *buff)
 /* receivAll e sendAll são funções auxiliares utulizadas
    na função forwardMsg, garante que os dados sejam
    todos enviados/recebidos */
-void receivAll(int sockIn, uint8_t **buff)
+void receivAll(int sockIn, uint8_t *buff)
 {
 	ssize_t bytesReceived;
 	uint32_t len;
-	uint8_t *p_buff = *buff;	// ponteiro utilzado para percorrer 'buff'
+	uint8_t *p_buff = buff;	// ponteiro utilzado para percorrer 'buff'
+
+	printf("buff: %p\n", buff);
+	printf("p_buff: %p\n", p_buff);
+
+
 
 	do
 	{
@@ -68,11 +73,12 @@ void receivAll(int sockIn, uint8_t **buff)
 		if(bytesReceived == 0) // cliente desconectou
 		{
 			puts("cliente desconectado");
-			*buff = NULL;
+			buff = NULL;
+			printf("buff: %p\n", buff);
 			return;
 		}
 
-		len					 	= *(*buff + 3);
+		len					 	= *(buff + 3);
 		bytesReceived += bytesReceived;
 		p_buff 				+= bytesReceived;
 	}while(bytesReceived < len);
@@ -103,21 +109,23 @@ bool sendAll(int sockOut, char *buff, int len)
 int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 {
 	puts("inicio forwardMsg");
-	uint8_t *temp_buff;//[MAXBUFF] = {0};
+	uint8_t temp_buff[MAXBUFF] = {0};
 	PACKET *packet;
 	uint16_t i;
   bool localizado;
 
-	temp_buff = (uint8_t *) malloc(MAXBUFF);
+	//temp_buff = (uint8_t *) malloc(MAXBUFF);
 
 	//temp_buff = NULL;
-	receivAll(sock, &temp_buff);
+	printf("tempo_buff: %p\n", temp_buff);
+	receivAll(sock, temp_buff);
 	if(temp_buff == NULL){
 		puts("DISCONECTED");
 		return DISCONECTED;
 	}
 
-	printf("%s\n", temp_buff);
+	printf("tempo_buff: %p\n", temp_buff);
+
 	packet = deserialize(temp_buff);
 	if (packet == NULL)
 		erro("deserialize");
@@ -173,21 +181,21 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
  {
 	 struct sockaddr_in dadosCl; 			 // recebe os dados do cliente, por accept()
 	 PACKET *temp_packet;							 // estrutura temporaria até a validação do pacote
-	 uint8_t *temp_buff;//[MAXBUFF] = {0}; // buff temporario até a inclusão dos dados em PACKET->data
+	 uint8_t temp_buff[MAXBUFF] = {0}; // buff temporario até a inclusão dos dados em PACKET->data
 	 socklen_t tDadosCl = sizeof(dadosCl);
 
 	 uint16_t i;
 	 int sockCon = 0;		 			// file descriptor socket cliente
 	 uint8_t localizado = 0; // utilizada para verificar se o ID da conexão ja existe
 
-	 temp_buff = (uint8_t *) malloc(MAXBUFF);
+	 //temp_buff = (uint8_t *) malloc(MAXBUFF);
 
 	 if ((sockCon = accept(fSockSv,(SA *) &dadosCl, &tDadosCl)) < 0)
 	 		erro("accpet");
 
-	 receivAll(sockCon, &temp_buff);
-   if (temp_buff == 0){
-		 puts("aui");
+	 receivAll(sockCon, temp_buff);
+   if (temp_buff == NULL){
+		 puts("DISCONECTED - valida");
 		 close(sockCon);
 		 return false;
 	 }
