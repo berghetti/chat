@@ -19,7 +19,8 @@
 enum COD_ERRO{
   FAILSEND = 1, // falha ao enviar mensagem
   WAITPAIR,     // aguardar par da conexão para encaminhar mensagem
-  DISCONECTED   // cliente desconectado
+  DISCONECTED,   // cliente desconectado
+  INVALID       // pacote invalido
 };
 
 // var global

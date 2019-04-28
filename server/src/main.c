@@ -63,6 +63,8 @@ int main(void)
 				{	// retorna o file descriptor da conexão
 					if( (fd = validar(&activeFdSet, admins, clientes)) > 0)
  						maxFd = (maxFd > fd) ? maxFd : fd;
+					else
+						continue; // conexão invalida, pula para proxima iteração
 				}
 				else
 				{
@@ -79,7 +81,7 @@ int main(void)
 						FD_CLR(i, &activeFdSet);
 						clearCon(i);
 						close(i);
-						break;
+						continue;
 					} // switch
 				}
 			} //if FD_ISSET
