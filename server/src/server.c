@@ -7,7 +7,6 @@
 #include <sys/socket.h>     // socket
 #include <netinet/in.h>     // inet_ntoa
 #include <arpa/inet.h>      // inet_ntoa
-#include <sys/select.h>			// select
 #include <unistd.h>         // close
 
 #include <server.h>
@@ -41,13 +40,10 @@ PACKET * deserialize(uint8_t *buff)
 	packet->head.len 	= ntohl(packet->head.len);
 
 	padding += sizeof(packet->head.len);
-	packet->data = (char *) malloc(packet->head.len); //verificar cast
+	packet->data = (uint8_t *) malloc(packet->head.len);
+	if(packet->data == NULL)
+		return NULL;
 	memcpy(packet->data, buff + padding, packet->head.len);
-
-
-	printf("type - %x\n", (unsigned int) packet->head.type);
-	printf("id   - %d\n", (unsigned int) packet->head.id);
-	printf("len  - %d\n", (unsigned int) packet->head.len);
 
 	return packet;
 }
@@ -56,51 +52,39 @@ PACKET * deserialize(uint8_t *buff)
 /* receivAll e sendAll são funções auxiliares utulizadas
    na função forwardMsg, garante que os dados sejam
    todos enviados/recebidos */
-void receivAll(int sockIn, uint8_t *buff)
+bool receivAll(int sockIn, uint8_t *buff, size_t buffsize)
 {
-	ssize_t bytesReceived;
+	ssize_t bytes_recv;
 	uint32_t len;
 	uint8_t *p_buff = buff;	// ponteiro utilzado para percorrer 'buff'
 
-	printf("buff: %p\n", buff);
-	printf("p_buff: %p\n", p_buff);
-
-
-
 	do
 	{
-		bytesReceived = recv(sockIn, p_buff, MAXBUFF, 0);
-		if(bytesReceived == 0) // cliente desconectou
-		{
-			puts("cliente desconectado");
-			buff = NULL;
-			printf("buff: %p\n", buff);
-			return;
-		}
+		bytes_recv = recv(sockIn, p_buff, buffsize, 0);
+		if(bytes_recv <= 0) // cliente desconectou ou recv retornou erro
+			return false;
 
-		len					 	= *(buff + 3);
-		bytesReceived += bytesReceived;
-		p_buff 				+= bytesReceived;
-	}while(bytesReceived < len);
+		len				 = *(buff + 3);
+		bytes_recv += bytes_recv;
+		p_buff 		 += bytes_recv;
+	}while(bytes_recv < len);
+	return true;
 }
 
-
-bool sendAll(int sockOut, char *buff, int len)
+bool sendAll(int sockOut, uint8_t *buff, size_t len)
 {
-		char *pBuff = buff;
-		unsigned int bytesSent = 0;
+	uint8_t *p_buff = buff;
+	ssize_t bytes_send;
 
-		// enviar dados
-		while (len > 0)
-		{
-			puts("Enviando...");
-			if((bytesSent = send(sockOut, pBuff, len, 0)) == -1)
-				return false;
-			pBuff += bytesSent;
-			len -= bytesSent;
-		}
-
-		return true;
+	while (len > 0)
+	{
+		bytes_send = send(sockOut, p_buff, len, 0);
+		if(bytes_send < 0)	// erro ao enviar
+			return false;
+		p_buff += bytes_send;
+		len    -= bytes_send;
+	}
+	return true;
 }
 
 /*
@@ -108,23 +92,17 @@ bool sendAll(int sockOut, char *buff, int len)
  */
 int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 {
-	puts("inicio forwardMsg");
 	uint8_t temp_buff[MAXBUFF] = {0};
 	PACKET *packet;
 	uint16_t i;
   bool localizado;
 
-	//temp_buff = (uint8_t *) malloc(MAXBUFF);
 
-	//temp_buff = NULL;
-	printf("tempo_buff: %p\n", temp_buff);
-	receivAll(sock, temp_buff);
-	if(temp_buff == NULL){
+	if (!receivAll(sock, temp_buff, MAXBUFF))
+	{
 		puts("DISCONECTED");
 		return DISCONECTED;
 	}
-
-	printf("tempo_buff: %p\n", temp_buff);
 
 	packet = deserialize(temp_buff);
 	if (packet == NULL)
@@ -133,7 +111,6 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 	localizado = false;
 	if(!memcmp(&packet->head.type, "CL", sizeof(packet->head.type)))
 	{
-		puts("aqui - 1");
 		for(i = 0; i < MAXCLIENT; i++)
 		{
 			if(admins[i].head.id == packet->head.id)
@@ -146,11 +123,15 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
         }
       }
 		} // não foi encontrado par com mesmo ID
-    if (!localizado) return WAITPAIR;
+    if (!localizado)
+		{
+			free(packet->data);
+			free(packet);
+			return WAITPAIR;
+		}
 	}
 	else if(!memcmp(&packet->head.type, "AD", sizeof(packet->head.type)))
 	{
-		puts("aqui - 2");
 		for(i = 0; i < MAXCLIENT; i++)
 		{
 			if(clientes[i].head.id == packet->head.id)
@@ -163,42 +144,47 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
   			}
       }
 		} // não foi encontrado par com mesmo ID
-    if (!localizado) return WAITPAIR;
+		if (!localizado)
+		{
+			free(packet->data);
+			free(packet);
+			return WAITPAIR;
+		}
 	}
 	else
 	{
 		close(sock);
+		free(packet->data);
 		free(packet);
 		return INVALID;
 	}
 
-	puts("return forwardMsg");
+	free(packet->data);
+	free(packet);
 	return 0;
 }
 
 
-int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
+int validar(PACKET *admins, PACKET *clientes)
  {
 	 struct sockaddr_in dadosCl; 			 // recebe os dados do cliente, por accept()
 	 PACKET *temp_packet;							 // estrutura temporaria até a validação do pacote
 	 uint8_t temp_buff[MAXBUFF] = {0}; // buff temporario até a inclusão dos dados em PACKET->data
 	 socklen_t tDadosCl = sizeof(dadosCl);
 
-	 uint16_t i;
-	 int sockCon = 0;		 			// file descriptor socket cliente
-	 uint8_t localizado = 0; // utilizada para verificar se o ID da conexão ja existe
+	 int sockCon = 0;		 		 // file descriptor socket cliente
+	 uint16_t i;						 // contador
+	 uint8_t localizado;     // utilizada para verificar se o ID da conexão ja existe
 
-	 //temp_buff = (uint8_t *) malloc(MAXBUFF);
-
-	 if ((sockCon = accept(fSockSv,(SA *) &dadosCl, &tDadosCl)) < 0)
+	if ((sockCon = accept(fSockSv,(SA *) &dadosCl, &tDadosCl)) < 0)
 	 		erro("accpet");
 
-	 receivAll(sockCon, temp_buff);
-   if (temp_buff == NULL){
-		 puts("DISCONECTED - valida");
-		 close(sockCon);
-		 return false;
-	 }
+	if (!receivAll(sockCon, temp_buff, MAXBUFF))
+	{
+		puts("DISCONECTED");
+		close(sockCon);
+		return false;
+	}
 
 
 	// return packet preenchido com tipo, id, len e data
@@ -208,6 +194,7 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 
    // identifica conexão
 	 // caso o packet recebido seja do tipo cliente
+	 localizado = false;
 	 if(!memcmp(&temp_packet->head.type, "CL", sizeof(temp_packet->head.type)))
 	 {
 		 puts("Conexão cliente recebida");
@@ -221,6 +208,7 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 			 {
 				 localizado = true;
 				 close(sockCon);
+				 free(temp_packet->data);
 				 free(temp_packet);
 				 printf("ID %d cliente duplicado, deconectado ultimna solicitação\n", clientes[i].head.id);
 				 break;
@@ -234,8 +222,8 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 				 if(clientes[i].head.id == 0)
 				 {
 					 clientes[i] = *temp_packet;
+					 free(temp_packet->data);
 					 free(temp_packet);
-					 FD_SET(clientes[i].sock, activeFdSet);
            printf("Cliente conectado %s:%d ID - %d\n",
                  clientes[i].adress, clientes[i].port, clientes[i].head.id);
 					 break;
@@ -257,6 +245,7 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 			 {
 				 localizado = true;
 				 close(sockCon);
+				 free(temp_packet->data);
 				 free(temp_packet);
 				 printf("ID %d admin duplicado, deconectado ultimna solicitação\n", admins[i].head.id);
 				 break;
@@ -270,8 +259,8 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 				 if(admins[i].head.id == 0)
 				 {
 					 admins[i] = *temp_packet;
+					 free(temp_packet->data);
 					 free(temp_packet);
-					 FD_SET(admins[i].sock, activeFdSet);
            printf("Admin conectado %s:%d ID - %d\n",
                  admins[i].adress, admins[i].port, admins[i].head.id);
 					 break;
@@ -282,10 +271,10 @@ int validar(fd_set *activeFdSet, PACKET *admins, PACKET *clientes)
 	 else
 	 { // desconecta caso a conexão não possa ser identificada
  	 		close(sockCon);
+			free(temp_packet->data);
     	free(temp_packet);
 			return false;
 	 }
-
 	 return sockCon;
  } // validar()
 

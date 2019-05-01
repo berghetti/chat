@@ -37,7 +37,7 @@ struct header{
 // estrutura da mensagem que o servidor deve receber
 typedef struct {
   struct header head; // cabeçaho do pacote
-	char *data;			    // dados da mensagem excluido o cabeçaho
+	uint8_t *data;			// dados da mensagem excluido o cabeçaho
   char *adress;       // endereço do cliente
   uint16_t port;      // porta de conexão do cliente
 	int sock;				    // socket associado ao cliente
@@ -60,7 +60,7 @@ int startSocket(void);
   caso a conexão seja valida, adiciona o identificador
   no vetor apropriado - clientes ou admnis - e retorna o
   file descriptor da conexão */
-int validar(fd_set *activeFdSet, PACKET *clientes, PACKET *admins);
+int validar(PACKET *clientes, PACKET *admins);
 
 // função de erro padrão
 void erro(char *);

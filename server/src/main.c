@@ -24,22 +24,22 @@ int main(void)
 	clientes = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
 	admins = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
 
-	memset(clientes, 0, sizeof(PACKET));
-	memset(admins, 0, sizeof(PACKET));
+	memset(clientes, 0, sizeof(PACKET) * MAXCLIENT);
+	memset(admins, 0, sizeof(PACKET) * MAXCLIENT);
 
 	int i;
 	int status;
 	int fd;
 
 	int maxFd;						/* valor do maior file descriptor */
-	fd_set activeFdSet;   /* estrutura que recebe descritores ativos */
-	fd_set readFdSet;     /* estrutura que é atualizada a cada iteração */
+	fd_set active_set;   /* estrutura que recebe descritores ativos */
+	fd_set read_set;     /* estrutura que é atualizada a cada iteração */
 
 	if((fSockSv = startSocket()) < 0)
 		erro("socket");
 
-	FD_ZERO(&activeFdSet); 				 /* zera fd_set */
-	FD_SET(fSockSv, &activeFdSet); // inclui o socket do servidor
+	FD_ZERO(&active_set); 				 /* zera fd_set */
+	FD_SET(fSockSv, &active_set); // inclui o socket do servidor
 
 	maxFd = fSockSv;
 
@@ -47,22 +47,25 @@ int main(void)
 
 	while(1)
 	{
-		readFdSet = activeFdSet;
+		read_set = active_set;
 
-		if(select(maxFd + 1, &readFdSet, NULL, NULL, NULL) < 0)
+		if(select(maxFd + 1, &read_set, NULL, NULL, NULL) < 0)
 				erro("select");
 
 		for(i = 0; i <= maxFd; i++)
 		{
-			if(FD_ISSET(i, &readFdSet))
+			if(FD_ISSET(i, &read_set))
 			{
 				/* caso seja uma nova conexão
 				   verifica se é uma conexão validar
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
 				{	// retorna o file descriptor da conexão
-					if( (fd = validar(&activeFdSet, admins, clientes)) > 0)
- 						maxFd = (maxFd > fd) ? maxFd : fd;
+					if ( (fd = validar(admins, clientes)) > 0)
+					{
+						FD_SET(fd, &active_set);
+						maxFd = (maxFd > fd) ? maxFd : fd;
+					}
 					else
 						continue; // conexão invalida, pula para proxima iteração
 				}
@@ -78,7 +81,7 @@ int main(void)
 
 					case FAILSEND:
 					case DISCONECTED:
-						FD_CLR(i, &activeFdSet);
+						FD_CLR(i, &active_set);
 						clearCon(i);
 						close(i);
 						continue;
@@ -87,7 +90,8 @@ int main(void)
 			} //if FD_ISSET
 		} // for i
 	} // while true
-
+	free(clientes);
+	free(admins);
 	return 0;
 }
 
