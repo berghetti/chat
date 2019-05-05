@@ -18,12 +18,8 @@
  2 bytes - tipos
  4 bytes - id
  4 bytes - len */
-PACKET * deserialize(uint8_t *buff)
+bool deserialize(PACKET *packet, uint8_t *buff)
 {
-	PACKET *packet = (PACKET *) malloc(sizeof(PACKET));
-	if (packet == NULL)
-		return NULL;
-
 	uint8_t padding;
 
 	memcpy(&packet->head.type, buff, sizeof(packet->head.type));
@@ -42,12 +38,11 @@ PACKET * deserialize(uint8_t *buff)
 	padding += sizeof(packet->head.len);
 	packet->data = (uint8_t *) malloc(packet->head.len);
 	if(packet->data == NULL)
-		return NULL;
+		return false;
 	memcpy(packet->data, buff + padding, packet->head.len);
 
-	return packet;
+	return true;
 }
-
 
 /* receivAll e sendAll são funções auxiliares utulizadas
    na função forwardMsg, garante que os dados sejam
@@ -87,52 +82,132 @@ bool sendAll(int sockOut, uint8_t *buff, size_t len)
 	return true;
 }
 
+int clean_disconected(size_t sock)
+{
+	PACKET *TempPacketForDelete = create_packet();
+	PACKET *testeRealloc = NULL;
+	int i;
+
+	for (i = 0; i < tot_client; i++){
+		printf("\nclientes[%d].type - %d\n", i, clientes[i].head.type);
+		printf("clientes[%d].id - %d\n", i, clientes[i].head.id);
+		printf("clientes[%d].sock - %d\n", i, clientes[i].sock);
+		printf("clientes[%d].port - %d\n", i, clientes[i].port);
+	}
+
+	for(i = 0; i < tot_client; i++)
+	{
+		printf("quantos vezes necessario procurar  - %d\n", i);
+		if (clientes[i].sock == sock)
+		{	/* troca o elemento encontrado pelo utimo da lista,
+			 pois realloc ao diminuir retira a partir dos ultimos */
+
+			printf("\nSock localizado - %ld\n", sock);
+			printf("Clientes[%d].sock -  %d\n",i,  clientes[i].sock);
+
+			printf("\ncliente %s:%d - ID %d desconectou\n",
+							clientes[i].adress, clientes[i].port, clientes[i].head.id);
+
+			// inveter posiçẽso do ultimo cliente, com cliente que desconectou
+			*TempPacketForDelete 		= clientes[i];
+			clientes[i] 						= clientes[tot_client - 1];
+			clientes[tot_client -1] = *TempPacketForDelete;
+			free(TempPacketForDelete);
+
+			tot_client--;
+			printf("Total de clientes - %ld\n", tot_client);
+			if(tot_client == 0){
+				free(clientes);
+				free(admins);
+				admins = NULL;
+				clientes = NULL;
+				exit(0);
+				return 0;
+			}
+
+			puts("lipando...");
+			break;
+		}
+	}
+	printf("Total de clientes - realloc- %ld\n", tot_client);
+	testeRealloc = resize_array(clientes, tot_client);
+	if(testeRealloc != NULL){
+		clientes = testeRealloc;
+		testeRealloc = NULL;
+		puts("Realocado com sucesso!") ;
+	}
+	else{
+		puts("Falha ao realocar array");
+		free(testeRealloc);
+		return -1;
+	}
+
+
+	for (i = 0; i < tot_client; i++){
+		printf("\nclientes[%d].type - %d\n", i, clientes[i].head.type);
+		printf("clientes[%d].id - %d\n", i, clientes[i].head.id);
+		printf("clientes[%d].sock - %d\n", i, clientes[i].sock);
+		printf("clientes[%d].port - %d\n", i, clientes[i].port);
+	}
+	return 0;
+}
+
 /*
  * faz o encaminhamento das mensagens entre os cliente conectados
  */
-int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
+int forwardMsg(int sock_in)
 {
 	uint8_t temp_buff[MAXBUFF] = {0};
 	PACKET *packet;
 	uint16_t i;
   bool localizado;
 
-
-	if (!receivAll(sock, temp_buff, MAXBUFF))
-	{
+	if (!receivAll(sock_in, temp_buff, MAXBUFF)){
+		close(sock_in);
 		puts("DISCONECTED");
 		return DISCONECTED;
 	}
 
-	packet = deserialize(temp_buff);
-	if (packet == NULL)
-		erro("deserialize");
+	packet = create_packet();
+	if(packet == NULL){
+		close(sock_in);
+		free_packet(packet);
+		erro("falha ao alocar packet temporario");
+		return ERRO_MEMORY;
+	}
+
+	if(!deserialize(packet, temp_buff)){
+		close(sock_in);
+		free_packet(packet);
+		erro("falha ao deserializar dados, falha ao alocar espaço para data");
+		return ERRO_MEMORY;
+	}
+
 
 	localizado = false;
 	if(!memcmp(&packet->head.type, "CL", sizeof(packet->head.type)))
 	{
-		for(i = 0; i < MAXCLIENT; i++)
+		for(i = 0; i < tot_admin; i++)
 		{
 			if(admins[i].head.id == packet->head.id)
       {
         localizado = true;
 			  if(!sendAll(admins[i].sock, packet->data, packet->head.len + 1))
 			  {
-				  admins[i].head.id = 0;
+				  //clean_disconected(admins[i].sock);
 				  return FAILSEND;
         }
       }
 		} // não foi encontrado par com mesmo ID
     if (!localizado)
 		{
-			free(packet->data);
-			free(packet);
-			return WAITPAIR;
+			free_packet(packet);
+			return PEER_NOT_FOUND;
 		}
 	}
 	else if(!memcmp(&packet->head.type, "AD", sizeof(packet->head.type)))
 	{
-		for(i = 0; i < MAXCLIENT; i++)
+		for(i = 0; i < tot_client; i++)
 		{
 			if(clientes[i].head.id == packet->head.id)
       {
@@ -146,51 +221,63 @@ int forwardMsg(int sock, PACKET *admins, PACKET *clientes)
 		} // não foi encontrado par com mesmo ID
 		if (!localizado)
 		{
-			free(packet->data);
-			free(packet);
-			return WAITPAIR;
+			free_packet(packet);
+			packet = NULL;
+			return PEER_NOT_FOUND;
 		}
 	}
 	else
 	{
-		close(sock);
-		free(packet->data);
-		free(packet);
+		close(sock_in);
+		free_packet(packet);
 		return INVALID;
 	}
 
-	free(packet->data);
-	free(packet);
+	free_packet(packet);
+	packet = NULL;
 	return 0;
 }
 
 
-int validar(PACKET *admins, PACKET *clientes)
+	int validar()
  {
 	 struct sockaddr_in dadosCl; 			 // recebe os dados do cliente, por accept()
 	 PACKET *temp_packet;							 // estrutura temporaria até a validação do pacote
 	 uint8_t temp_buff[MAXBUFF] = {0}; // buff temporario até a inclusão dos dados em PACKET->data
 	 socklen_t tDadosCl = sizeof(dadosCl);
 
-	 int sockCon = 0;		 		 // file descriptor socket cliente
+	 int new_con = 0;		 		 // file descriptor socket cliente
 	 uint16_t i;						 // contador
-	 uint8_t localizado;     // utilizada para verificar se o ID da conexão ja existe
+	 bool localizado;     // utilizada para verificar se o ID da conexão ja existe
 
-	if ((sockCon = accept(fSockSv,(SA *) &dadosCl, &tDadosCl)) < 0)
-	 		erro("accpet");
 
-	if (!receivAll(sockCon, temp_buff, MAXBUFF))
-	{
-		puts("DISCONECTED");
-		close(sockCon);
-		return false;
+	new_con = accept(fSockSv,(SA *) &dadosCl, &tDadosCl);
+	if (new_con < 0){
+		erro("accpet");
+		return 0;
 	}
 
+	if (!receivAll(new_con, temp_buff, MAXBUFF)){
+		close(new_con);
+		erro("erro ao receber dados, possivel desconexão do cliente");
+		return 0;
+	}
 
-	// return packet preenchido com tipo, id, len e data
-	temp_packet = deserialize(temp_buff);
-	if(temp_packet == NULL)
-		erro("memoria");
+	temp_packet = create_packet();
+	if(temp_packet == NULL){
+		close(new_con);
+		free_packet(temp_packet);
+		erro("falha ao alocar memoria para packet temporario");
+		return 0;
+	}
+
+	// preenche temp_packet com dados do temp_buff, TYPE, ID, LEN E DATA
+	if(!deserialize(temp_packet, temp_buff)){
+		close(new_con);
+		free_packet(temp_packet);
+		erro("falha ao deserializar dados, falha ao alocar espaço para data");
+		return 0;
+	}
 
    // identifica conexão
 	 // caso o packet recebido seja do tipo cliente
@@ -198,84 +285,97 @@ int validar(PACKET *admins, PACKET *clientes)
 	 if(!memcmp(&temp_packet->head.type, "CL", sizeof(temp_packet->head.type)))
 	 {
 		 puts("Conexão cliente recebida");
-		 temp_packet->adress = inet_ntoa(dadosCl.sin_addr);
-     temp_packet->port   = ntohs(dadosCl.sin_port);
-		 temp_packet->sock 	 = sockCon;
-
-		 for(i = 0; i < MAXCLIENT; i++)		// verifica se o id ja esta na lista de clientes
+		 for(i = 0; i < tot_client; i++)		// verifica se o id ja esta na lista de clientes
 		 {
 			 if(clientes[i].head.id == temp_packet->head.id)
 			 {
 				 localizado = true;
-				 close(sockCon);
-				 free(temp_packet->data);
-				 free(temp_packet);
-				 printf("ID %d cliente duplicado, deconectado ultimna solicitação\n", clientes[i].head.id);
-				 break;
+				 close(new_con);
+				 free_packet(temp_packet);
+				 printf("ID %d cliente duplicado, deconectado ultimna solicitação\n",
+				  			clientes[i].head.id);
+				 return 0;
 			 }
 		 } // for localizar cliente
 
 		 if(!localizado)
 		 {
-			 for(i = 0; i < MAXCLIENT; i++)
-			 {
-				 if(clientes[i].head.id == 0)
-				 {
-					 clientes[i] = *temp_packet;
-					 free(temp_packet->data);
-					 free(temp_packet);
-           printf("Cliente conectado %s:%d ID - %d\n",
-                 clientes[i].adress, clientes[i].port, clientes[i].head.id);
-					 break;
-				 }
+			 PACKET *temp_clientes = NULL;
+			 tot_client++;
+			 temp_clientes = realloc(clientes, tot_client * sizeof(PACKET));
+			 if(temp_clientes == NULL){
+				 close(new_con);
+				 free_packet(temp_packet);
+				 erro("falho ao realocar array clientes");
+				 return 0;
 			 }
+			 else
+			 {
+				 clientes = temp_clientes;
+				 temp_clientes = NULL;
+			 }
+
+			 printf("total cliente - %ld\n", tot_client);
+			 clientes[tot_client - 1] = *temp_packet;
+			 free_packet(temp_packet);
+
+			 clientes[tot_client - 1].adress = inet_ntoa(dadosCl.sin_addr);
+			 clientes[tot_client - 1].port   = ntohs(dadosCl.sin_port);
+			 clientes[tot_client - 1].sock 	 = new_con;
+
+       printf("Cliente conectado %s:%d ID - %d\n",
+             clientes[tot_client - 1].adress, clientes[tot_client - 1].port, clientes[tot_client - 1].head.id);
 		 }
 	 }
 	 // se o pacote é do tipo admin
 	 else if(!memcmp(&temp_packet->head.type, "AD", sizeof(temp_packet->head.type)))
 	 {
 		 puts("Conexão admin recebida");
-     temp_packet->adress = inet_ntoa(dadosCl.sin_addr);
-     temp_packet->port   = ntohs(dadosCl.sin_port);
-		 temp_packet->sock 	 = sockCon;
-
-		 for(i = 0; i < MAXCLIENT; i++)
+		 for(i = 0; i < tot_admin; i++)
 		 {
 			 if(admins[i].head.id == temp_packet->head.id)
 			 {
 				 localizado = true;
-				 close(sockCon);
-				 free(temp_packet->data);
-				 free(temp_packet);
-				 printf("ID %d admin duplicado, deconectado ultimna solicitação\n", admins[i].head.id);
-				 break;
+				 close(new_con);
+				 free_packet(temp_packet);
+				 printf("ID %d admin duplicado, deconectado ultima solicitação\n",
+				  			admins[i].head.id);
+				 return 0;
 			 }
 		 }
 
 		 if(!localizado)
 		 {
-			 for(i = 0; i < MAXCLIENT; i++)
-			 {
-				 if(admins[i].head.id == 0)
-				 {
-					 admins[i] = *temp_packet;
-					 free(temp_packet->data);
-					 free(temp_packet);
-           printf("Admin conectado %s:%d ID - %d\n",
-                 admins[i].adress, admins[i].port, admins[i].head.id);
-					 break;
-				 }
+			 PACKET *temp_admins;
+			 tot_admin++;
+			 temp_admins = resize_array(admins, tot_admin);
+			 if(temp_admins == NULL){
+				 close(new_con);
+				 free_packet(temp_packet);
+				 erro("falho ao realocar array admins");
+				 return 0;
 			 }
+			 else
+			 		admins = temp_admins;
+
+			 admins[tot_admin - 1] = *temp_packet;	// copia id, tipo, len e data
+			 free_packet(temp_packet);
+
+			 admins[tot_admin -1].adress = inet_ntoa(dadosCl.sin_addr);
+			 admins[tot_admin -1].port   = ntohs(dadosCl.sin_port);
+			 admins[tot_admin -1].sock 	 = new_con;
+
+       printf("Admin conectado %s:%d ID - %d\n",
+             admins[tot_admin - 1].adress, admins[tot_admin - 1].port, admins[tot_admin - 1].head.id);
 		 }
 	 }
 	 else
 	 { // desconecta caso a conexão não possa ser identificada
- 	 		close(sockCon);
-			free(temp_packet->data);
-    	free(temp_packet);
-			return false;
+ 	 		close(new_con);
+			free_packet(temp_packet);
+			return 0;
 	 }
-	 return sockCon;
+	 return new_con;
  } // validar()
 
 

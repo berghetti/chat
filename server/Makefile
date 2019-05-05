@@ -1,5 +1,5 @@
 
-FLAGS 	= -Wall -Werror -O2 -pedantic
+FLAGS 	= -Wall -Werror -O2 -pedantic -g
 
 SRC 		= ./src
 BIN 		= ./bin
@@ -9,7 +9,7 @@ INCLUDE = ./include
 
 all: server
 
-server: $(OBJ)/main.o $(OBJ)/server.o
+server: $(OBJ)/main.o $(OBJ)/server.o $(OBJ)/packet.o
 	gcc $(FLAGS) $(OBJ)/*.o -I $(INCLUDE) -o $(BIN)/$@
 
 #mascara genérica para compilar os arquivos objetos

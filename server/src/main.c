@@ -8,24 +8,17 @@
 #include <server.h>			// in ./include
 
 // armazana clientes e administradores conectados
-PACKET *clientes;
-PACKET *admins;
+PACKET *clientes = NULL;
+PACKET *admins = NULL;
 
+size_t tot_client = 0;	// total de clientes no servidor
+size_t tot_admin = 0;	// total de admins no servidor
 int fSockSv;
-// zera os dados da conexão
-void clearCon(int sock);
+
 
 int main(void)
 {
 	setlocale(LC_ALL, "");
-
-	// cria vetor com tamanho MAXCLIENT
-	// acessa cada espaço com clientes[i].campo
-	clientes = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
-	admins = (PACKET *) malloc(sizeof(PACKET) * MAXCLIENT);
-
-	memset(clientes, 0, sizeof(PACKET) * MAXCLIENT);
-	memset(admins, 0, sizeof(PACKET) * MAXCLIENT);
 
 	int i;
 	int status;
@@ -61,8 +54,7 @@ int main(void)
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
 				{	// retorna o file descriptor da conexão
-					if ( (fd = validar(admins, clientes)) > 0)
-					{
+					if ( (fd = validar()) > 0){
 						FD_SET(fd, &active_set);
 						maxFd = (maxFd > fd) ? maxFd : fd;
 					}
@@ -72,46 +64,29 @@ int main(void)
 				else
 				{
 					puts("Recebendo dados...");
-					status = forwardMsg(i, admins, clientes);
+					status = forwardMsg(i);
 					switch (status)
 					{
-					case WAITPAIR:
+					case PEER_NOT_FOUND:
 						puts("Não localizado par com mesmo ID");
+						continue;
+
+					case ERRO_MEMORY:
 						continue;
 
 					case FAILSEND:
 					case DISCONECTED:
 						FD_CLR(i, &active_set);
-						clearCon(i);
+						clean_disconected(i);
 						close(i);
+						// clearCon(i);
 						continue;
 					} // switch
 				}
 			} //if FD_ISSET
 		} // for i
 	} // while true
-	free(clientes);
-	free(admins);
+	// free_packet(clientes);
+	// free_packet(admins);
 	return 0;
-}
-
-void clearCon(int sock)
-{
-	int j;
-	for(j = 0; j < MAXCLIENT; j++)
-	{
-		if(clientes[j].sock == sock){
-			printf("Conexão cliente desconectou - %s:%d ID - %d!\n",
-						clientes[j].adress, clientes[j].port, clientes[j].head.id);
-			memset(&clientes[j], 0, sizeof(PACKET));
-			break;
-		}
-		else if (admins[j].sock == sock)
-		{
-			printf("Conexão admin desconectou - %s:%d ID - %d\n",
-							admins[j].adress, admins[j].port, admins[j].head.id);
-			memset(&admins[j], 0, sizeof(PACKET));
-			break;
-		}
-	}
 }
