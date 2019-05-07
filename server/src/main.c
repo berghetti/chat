@@ -11,8 +11,8 @@
 PACKET *clientes = NULL;
 PACKET *admins = NULL;
 
-size_t tot_client = 0;	// total de clientes no servidor
-size_t tot_admin = 0;	// total de admins no servidor
+uint32_t totalClientes = 0;	// total de clientes no servidor
+uint32_t totalAdmins = 0;	// total de admins no servidor
 int fSockSv;
 
 
@@ -23,7 +23,6 @@ int main(void)
 	int i;
 	int status;
 	int fd;
-
 	int maxFd;						/* valor do maior file descriptor */
 	fd_set active_set;   /* estrutura que recebe descritores ativos */
 	fd_set read_set;     /* estrutura que é atualizada a cada iteração */
@@ -41,7 +40,7 @@ int main(void)
 	while(1)
 	{
 		read_set = active_set;
-
+		printf("\n\n total de users ativos - %d\n\n", totalAdmins + totalClientes);
 		if(select(maxFd + 1, &read_set, NULL, NULL, NULL) < 0)
 				erro("select");
 
@@ -54,12 +53,13 @@ int main(void)
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
 				{	// retorna o file descriptor da conexão
-					if ( (fd = validar()) > 0){
+					fd = validar();
+					if (!fd)
+						continue; // conexão invalida, pula para proxima iteração
+					else{
 						FD_SET(fd, &active_set);
 						maxFd = (maxFd > fd) ? maxFd : fd;
 					}
-					else
-						continue; // conexão invalida, pula para proxima iteração
 				}
 				else
 				{
@@ -77,9 +77,8 @@ int main(void)
 					case FAILSEND:
 					case DISCONECTED:
 						FD_CLR(i, &active_set);
-						clean_disconected(i);
-						close(i);
-						// clearCon(i);
+						clearData(i);
+
 						continue;
 					} // switch
 				}

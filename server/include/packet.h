@@ -20,7 +20,7 @@ typedef struct {
 
 PACKET * create_packet();
 
-PACKET * resize_array(PACKET *old_packet, size_t tot_client);
+bool resize_array(PACKET **, size_t);
 
 void free_packet(PACKET *packet);
 

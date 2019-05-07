@@ -17,8 +17,8 @@
 
 // var global
 extern int fSockSv;
-extern size_t tot_client;
-extern size_t tot_admin;
+extern uint32_t totalClientes;
+extern uint32_t totalAdmins;
 
 extern PACKET *clientes;  // array dinamico que aloca os clientes conectados
 extern PACKET *admins;    // array dinamico que aloca os admins conectados
@@ -37,8 +37,9 @@ enum COD_ERRO{
 
 
 typedef struct sockaddr SA;
+typedef struct sockaddr_in SA_I;
 
-int clean_disconected(size_t sock);
+int clearData(int sock);
 
 bool deserialize(PACKET *, uint8_t *);
 

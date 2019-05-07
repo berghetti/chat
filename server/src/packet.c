@@ -13,16 +13,26 @@ PACKET * create_packet()
   return packet;
 }
 
-PACKET * resize_array(PACKET *old_packet, size_t new_len)
+bool resize_array(PACKET **oldPtr, size_t newLen)
 {
-  PACKET *packet;
-  packet = (PACKET *) realloc(old_packet, sizeof(PACKET) * new_len);
-  if(packet == NULL){
-    free(packet);
-    return NULL;
+  PACKET *newPtr = NULL;
+  if(newLen < 0)
+    return false;
+  else
+  if(newLen == 0){
+    free(*oldPtr);
+    *oldPtr = NULL;
+    return true;
   }
-
-  return packet;
+  else{
+    newPtr = (PACKET *) realloc(*oldPtr, newLen * sizeof(PACKET));
+    if(newPtr == NULL){
+      free(newPtr);
+      return false;
+    }
+  }
+  *oldPtr = newPtr;
+  return true;
 }
 
 void free_packet(PACKET *packet)
