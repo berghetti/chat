@@ -16,9 +16,9 @@
 
 // funções auxiliares
 
-/* receivAll e sendAll são funções auxiliares utulizadas
-   na função forwardMsg, garante que os dados sejam
-   todos enviados/recebidos */
+/* função auxiliar que garante o rebecimento de
+   todos os dados conforme especificado no campo 'len'
+	 do cabeçalho da mensagem */
 bool receivAll(int sockIn, uint8_t *buff, size_t buffsize)
 {
 	ssize_t bytes_recv;
@@ -38,6 +38,9 @@ bool receivAll(int sockIn, uint8_t *buff, size_t buffsize)
 	return true;
 }
 
+/* função auxiliar que garante o envio de todos
+   os dados conforme especificado no campo 'len'
+	 do cabeçaho da mensagem */
 bool sendAll(int sockOut, uint8_t *buff, size_t len)
 {
 	uint8_t *p_buff = buff;
@@ -54,7 +57,8 @@ bool sendAll(int sockOut, uint8_t *buff, size_t len)
 	return true;
 }
 
-
+/* função auxiliar que deserializa os bytes
+   em uma strutura do tipo 'PACKET' */
 bool deserialize(PACKET *packet, uint8_t *buff)
 {
 	/*cabeçalho
@@ -88,43 +92,29 @@ bool deserialize(PACKET *packet, uint8_t *buff)
 	return true;
 }
 
-// identifica os bytes contidos em header para confirmar tipo esperado
+/* função auxiliar que retorno se o pacote é do tipo esperado */
 bool identifyConnection(void *tipoRecebido , void *tipoDesejado)
 {
 	return (memcmp(tipoRecebido, tipoDesejado, 2) == 0);
 }
 
-bool checkDuplicatedId(PACKET *actives, PACKET *newClient, size_t len)
+/* função auxiliar examine array do tipo PACKET
+   em busca de um ID especifico */
+bool checkDuplicatedId(PACKET *array, uint32_t id, size_t len)
 {
 	int count;
 	for(count = 0; count < len; count++){
-		if(actives[count].head.id == newClient->head.id)
+		if(array[count].head.id == id)
 			return true;
 	}
 	return false;
 }
 
-void addDataNewCon(SA_I *newDados, PACKET *actives, size_t len)
-{
-	char *ativo;
-
-	if(identifyConnection(&actives[len -1].head.type, "CL"))
-		ativo = "Cliente";
-	else
-		ativo = "Admin";
-
-	actives[len - 1].adress = inet_ntoa(newDados->sin_addr);
-	actives[len - 1].port   = ntohs(newDados->sin_port);
-
-	printf("%s conectado %s:%d ID - %d\n",
-					ativo,
-					actives[len - 1].adress,
-					actives[len - 1].port,
-					actives[len - 1].head.id);
-}
-
 // funções utilizadas na main
 
+/* localiza a qual user pertence o socket que
+	 desconectou, copia o ultimo user do array para a posição do
+	 user que desconectou e redimensiona o array com reallc */
 int clearData(int sock)
 {
 	int i;
@@ -204,9 +194,7 @@ int clearData(int sock)
 	return 0;
 }
 
-/*
- * faz o encaminhamento das mensagens entre admin x clientes
- */
+/* faz o encaminhamento das mensagens entre admin x clientes */
 int forwardMsg(int sock_in)
 {
 	uint8_t tempBuffer[MAXBUFF] = {0};
@@ -291,9 +279,9 @@ int forwardMsg(int sock_in)
 	}
 }
 
-/* funcao testa nova conexão se o pacote recebidos
+/* funcao testa nova conexão se o pacote recebido (cliente ou admin)
    é de algum tipo esperado, caso não seja returna 0 */
-int validar()
+int validar(void)
 {
 	uint8_t tempBuffer[MAXBUFF] = {0};
 	PACKET *tempPacket;
@@ -336,7 +324,7 @@ int validar()
 	{
 		puts("Analisando conexão cliente...");
 
-		if(checkDuplicatedId(clientes, tempPacket, totalClientes))
+		if(checkDuplicatedId(clientes, tempPacket->head.id, totalClientes))
 		{
 			close(newCon);
 			free_packet(tempPacket);
@@ -359,8 +347,14 @@ int validar()
 			free_packet(tempPacket);
 			tempPacket = NULL;
 
-			clientes[totalClientes - 1].sock = newCon;
-			addDataNewCon(&dadosNewCon, clientes, totalClientes);
+			clientes[totalClientes - 1].sock   = newCon;
+			clientes[totalClientes - 1].adress = inet_ntoa(dadosNewCon.sin_addr);
+			clientes[totalClientes - 1].port   = ntohs(dadosNewCon.sin_port);
+
+			printf("Cliente conectado %s:%d ID - %d\n",
+							clientes[totalClientes - 1].adress,
+							clientes[totalClientes - 1].port,
+							clientes[totalClientes - 1].head.id);
 		}
 	}
 	 // se o pacote é do tipo admin
@@ -369,7 +363,7 @@ int validar()
 	{
 		puts("Analisando conexão admin...");
 
-		if(checkDuplicatedId(admins, tempPacket, totalAdmins))
+		if(checkDuplicatedId(admins, tempPacket->head.id, totalAdmins))
 		{
 			close(newCon);
 			free_packet(tempPacket);
@@ -392,8 +386,14 @@ int validar()
 			free_packet(tempPacket);
 			tempPacket = NULL;
 
-			admins[totalAdmins -1].sock = newCon;
-			addDataNewCon(&dadosNewCon, admins, totalAdmins);
+			admins[totalAdmins -1].sock    = newCon;
+			admins[totalAdmins - 1].adress = inet_ntoa(dadosNewCon.sin_addr);
+			admins[totalAdmins - 1].port   = ntohs(dadosNewCon.sin_port);
+
+			printf("Admin conectado %s:%d ID - %d\n",
+							admins[totalAdmins - 1].adress,
+							admins[totalAdmins - 1].port,
+							admins[totalAdmins - 1].head.id);
 		}
 	}
 	else
@@ -404,7 +404,7 @@ int validar()
 		return 0;
 	}
 	return newCon;
-} // validar()
+}
 
 
 int startSocket(void)
