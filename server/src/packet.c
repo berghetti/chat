@@ -9,7 +9,6 @@ PACKET * create_packet()
     free(packet);
     return NULL;
   }
-
   return packet;
 }
 
@@ -20,6 +19,7 @@ bool resize_array(PACKET **oldPtr, size_t newLen)
     return false;
   else
   if(newLen == 0){
+    //free(*oldPtrdata);
     free(*oldPtr);
     *oldPtr = NULL;
     return true;

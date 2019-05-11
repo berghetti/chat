@@ -48,7 +48,7 @@ int main(void)
 		{
 			if(FD_ISSET(i, &read_set))
 			{
-				/* caso seja uma nova conexão
+				/* caso seja uma nova conexão,
 				   verifica se é uma conexão validar
 				   e aloca no vetor adequado, clientes ou admins */
 				if(i == fSockSv)
@@ -69,23 +69,26 @@ int main(void)
 					{
 					case PEER_NOT_FOUND:
 						puts("Não localizado par com mesmo ID");
-						continue;
-
-					case ERRO_MEMORY:
-						continue;
+						break;
 
 					case FAILSEND:
 					case DISCONECTED:
 						FD_CLR(i, &active_set);
 						clearData(i);
+						break;
 
-						continue;
+					case ERRO_MEMORY:
+						break;
+
+					case INVALID:
+						exit(EXIT_FAILURE);
+
+					default:
+						break;
 					} // switch
 				}
 			} //if FD_ISSET
 		} // for i
 	} // while true
-	// free_packet(clientes);
-	// free_packet(admins);
 	return 0;
 }

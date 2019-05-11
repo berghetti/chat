@@ -17,12 +17,12 @@
 
 // var global
 extern int fSockSv;
-extern uint32_t totalClientes;
-extern uint32_t totalAdmins;
 
 extern PACKET *clientes;  // array dinamico que aloca os clientes conectados
 extern PACKET *admins;    // array dinamico que aloca os admins conectados
 
+extern uint32_t totalClientes;
+extern uint32_t totalAdmins;
 // extern char *ADMIN;
 // extern char *CLIENTE;
 
