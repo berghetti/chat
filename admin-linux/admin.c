@@ -78,9 +78,9 @@ int main(void){
           printf("%s", buff2);
           fflush(stdout);
       }
-      else if(FD_ISSET(fileno(stdin), &readFdSet)){
-        bytesread = read(fileno(stdin), buff2, MAXBUFF);
-        if (bytesread == -1)
+      else if(FD_ISSET(STDIN_FILENO, &readFdSet)){
+        bytesread = read(STDIN_FILENO, buff2, MAXBUFF);
+        if (bytesread <= 0)
           erro("read");
         if (bytesread > 0)
           bytesread++; // + 1 para incluir o caracter nulo
@@ -90,8 +90,12 @@ int main(void){
         pacote->data = (uint8_t *) buff2;
 
         dataSend = serialize(pacote);
-        printf("%ld\n", sizeof(pacote->head.type));
+        free(pacote);
+
+        printf("tamanho: %ld\n", bytesread);
+        printf("dados: %s\n",  buff2);
         send(fSock, dataSend, LEN_HEADER + bytesread, 0);
+        free(dataSend);
       }
 
     }
@@ -106,7 +110,6 @@ uint8_t * serialize(struct packet *pacote)
 
   // tamanho do bufer com base no tamanho da mensagem e no tamanho do cabeçalho
   buff = (uint8_t *) malloc(LEN_HEADER + pacote->head.len);
-
 
   // salva tamanho da mensagem antes de ordenar os bytes para big endian
   len = pacote->head.len;

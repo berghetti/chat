@@ -35,6 +35,7 @@ bool receivAll(int sockIn, uint8_t *buff, size_t buffsize)
 		bytes_recv += bytes_recv;
 		p_buff 		 += bytes_recv;
 	}while(bytes_recv < len);
+
 	return true;
 }
 
@@ -213,8 +214,6 @@ int forwardMsg(int sock_in)
 	if(tempPacket == NULL){
 		close(sock_in);
 		free_packet(tempPacket);
-		tempPacket = NULL;
-		erro("falha ao alocar packet temporario");
 		return ERRO_MEMORY;
 	}
 
@@ -406,7 +405,7 @@ int validar(void)
 	return newCon;
 }
 
-
+/* inicializa o socket */
 int startSocket(void)
 {
 	socklen_t tDadosSv;					/* armazena tamanha da estrutura */
@@ -440,12 +439,14 @@ int startSocket(void)
 	if ((bind(fSockSv, (SA *)&dadosSv, tDadosSv)) < 0)
 	{
 		erro("bind");
+		exit(EXIT_FAILURE);
 	}
 
 	/* habilita o socket a receber conexões */
 	if ((listen(fSockSv, 128) < 0))
 	{
 		erro("listen");
+		exit(EXIT_FAILURE);
 	}
 
 	return fSockSv;

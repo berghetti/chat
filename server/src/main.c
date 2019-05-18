@@ -23,7 +23,7 @@ int main(void)
 	int i;
 	int status;
 	int fd;
-	int maxFd;						/* valor do maior file descriptor */
+	int maxFd;					 /* valor do maior file descriptor */
 	fd_set active_set;   /* estrutura que recebe descritores ativos */
 	fd_set read_set;     /* estrutura que é atualizada a cada iteração */
 
@@ -78,6 +78,7 @@ int main(void)
 						break;
 
 					case ERRO_MEMORY:
+						erro("falha ao alocar/realocar memoria");
 						break;
 
 					case INVALID:
@@ -85,10 +86,10 @@ int main(void)
 
 					default:
 						break;
-					} // switch
+					}
 				}
-			} //if FD_ISSET
-		} // for i
-	} // while true
+			}
+		}
+	}
 	return 0;
 }
